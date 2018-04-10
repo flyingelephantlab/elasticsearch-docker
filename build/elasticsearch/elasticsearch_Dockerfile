@@ -1,0 +1,47 @@
+FROM centos:7
+LABEL maintainer "phawzy"
+
+
+ENV ELASTIC_VERSION 5.2.2
+ENV ELASTIC_TARBALL 'elasticsearch-${ELASTIC_VERSION}.tar.gz' 
+ENV ELASTIC_URL_ROOT 'https://artifacts.elastic.co/downloads/elasticsearch'
+
+ENV ELASTIC_CONTAINER true
+ENV PATH /usr/share/elasticsearch/bin:$PATH
+ENV JAVA_HOME /usr/lib/jvm/jre-1.8.0-openjdk
+
+RUN yum update -y && yum install -y java-1.8.0-openjdk-headless wget which && yum clean all
+
+RUN groupadd -g 1000 elasticsearch && adduser -u 1000 -g 1000 -d /usr/share/elasticsearch elasticsearch
+
+WORKDIR /usr/share/elasticsearch
+
+# Download and extract defined ES version. busybox tar can't strip leading dir.
+RUN wget --progress=bar:force $ELASTIC_URL_ROOT/$ELASTIC_TARBALL && \
+    tar zxf $ELASTIC_TARBALL && \
+    chown -R elasticsearch:elasticsearch elasticsearch-${ELASTIC_VERSION} && \
+    mv elasticsearch-${ELASTIC_VERSION}/* . && \
+    rmdir elasticsearch-${ELASTIC_VERSION} && \
+    rm elasticsearch-${ELASTIC_VERSION}.tar.gz
+
+RUN set -ex && for esdirs in config data logs; do \
+        mkdir -p "$esdirs"; \
+        chown -R elasticsearch:elasticsearch "$esdirs"; \
+    done
+
+USER elasticsearch
+
+COPY elasticsearch.yml log4j2.properties config/
+COPY bin/es-docker bin/es-docker
+
+USER root
+RUN chown elasticsearch:elasticsearch \
+      config/elasticsearch.yml \
+      config/log4j2.properties \
+      bin/es-docker && \
+    chmod 0750 bin/es-docker
+
+USER elasticsearch
+CMD ["/bin/bash", "bin/es-docker"]
+
+EXPOSE 9200 9300

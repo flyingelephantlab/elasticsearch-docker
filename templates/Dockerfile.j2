@@ -5,11 +5,9 @@
 
 {% if release_manager and elastic_version.endswith('-SNAPSHOT') -%}
 {%   set url_root = 'http://localhost/build/snapshot-artifacts/elasticsearch/distribution/tar/build/distributions' -%}
-{%   set x_pack_url_root = 'http://localhost/build/snapshot-artifacts/x-pack-elasticsearch/plugin/build/distributions' -%}
 {%   set plugin_url_root = 'http://localhost/build/snapshot-artifacts/elasticsearch/plugins/$PLUGIN/build/distributions' -%}
 {% elif release_manager -%}
 {%   set url_root = 'http://localhost/build/release-artifacts/elasticsearch/distribution/tar/build/distributions' -%}
-{%   set x_pack_url_root = 'http://localhost/build/release-artifacts/x-pack-elasticsearch/plugin/build/distributions' -%}
 {%   set plugin_url_root = 'http://localhost/build/release-artifacts/elasticsearch/plugins/$PLUGIN/build/distributions' -%}
 {% elif staging_build_num -%}
 {%   set version_tag = version_tag + '-' + staging_build_num -%}
@@ -48,22 +46,20 @@ USER elasticsearch
 
 # Install x-pack and also the ingest-{agent,geoip} modules required for Filebeat
 {% if release_manager -%}
-RUN elasticsearch-plugin install --batch "{{ x_pack_url_root }}/x-pack-{{ elastic_version }}.zip" && \
-    for PLUGIN in {{ ingest_plugins }}; do \
+RUN for PLUGIN in {{ ingest_plugins }}; do \
       elasticsearch-plugin install --batch "{{ plugin_url_root }}/$PLUGIN-{{ elastic_version }}.zip"; \
     done
 {% elif staging_build_num -%}
-RUN for PLUGIN in x-pack {{ ingest_plugins }}; do \
+RUN for PLUGIN in {{ ingest_plugins }}; do \
       eval ES_JAVA_OPTS="-Des.plugins.staging={{ staging_build_num }}" elasticsearch-plugin install --batch "$PLUGIN"; \
     done
 {% else -%}
-RUN for PLUGIN in x-pack {{ ingest_plugins }}; do \
+RUN for PLUGIN in {{ ingest_plugins }}; do \
       elasticsearch-plugin install --batch "$PLUGIN"; \
     done
 {% endif-%}
 
 COPY elasticsearch.yml log4j2.properties config/
-COPY x-pack/log4j2.properties config/x-pack/
 COPY bin/es-docker bin/es-docker
 
 USER root
